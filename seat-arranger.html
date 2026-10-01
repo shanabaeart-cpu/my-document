@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>우리 반 자리 배치</title>
+<style>
+  :root{
+    --bg:#f4f5f8; --surface:#ffffff; --ink:#1b2130; --muted:#6c7488; --faint:#a4abba;
+    --line:#e3e6ee; --accent:#4b56d2; --accent-2:#6f79f0; --accent-soft:#eef0ff;
+    --seat-line:#dde1ea; --danger:#d14a4a; --ok:#1f9d6b; --aisle:14px;
+    --radius:14px; --shadow:0 1px 2px rgba(20,25,45,.05),0 6px 22px rgba(20,25,45,.07);
+    font-family:"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
+  button,input,select,textarea{font:inherit;color:inherit}
+  button{cursor:pointer}
+
+  /* ---------- Top bar ---------- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 24px}
+  .brand{display:flex;align-items:baseline;gap:12px;min-width:0}
+  #title{margin:0;font-size:20px;font-weight:800;letter-spacing:-.02em;user-select:none;-webkit-user-select:none;cursor:default}
+  .today{color:var(--muted);font-size:14px;white-space:nowrap}
+  .tools{display:flex;gap:6px}
+  .icon-btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 12px;font-size:13px;color:var(--muted);transition:.15s}
+  .icon-btn:hover{color:var(--ink);border-color:#cfd4df}
+
+  /* ---------- Layout ---------- */
+  .layout{display:grid;grid-template-columns:320px minmax(0,1fr);gap:20px;padding:0 24px 28px;align-items:start}
+  body.panel-hidden .layout{grid-template-columns:minmax(0,1fr)}
+  body.panel-hidden #panel{display:none}
+  @media (max-width:980px){.layout{grid-template-columns:minmax(0,1fr)}.topbar{padding:14px 16px}.layout{padding:0 16px 24px}}
+
+  /* ---------- Panel ---------- */
+  .panel{background:var(--surface);border-radius:18px;box-shadow:var(--shadow);padding:20px;display:flex;flex-direction:column;gap:18px;position:sticky;top:16px}
+  .panel h2{margin:0 0 10px;font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.02em}
+  .seg{display:grid;grid-template-columns:1fr 1fr;background:#eef0f4;border-radius:11px;padding:4px;gap:4px}
+  .seg button{border:0;background:transparent;border-radius:8px;padding:9px 0;font-weight:600;font-size:14px;color:var(--muted)}
+  .seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .fields.three{grid-template-columns:1fr 1fr 1fr}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+  .field input,.field select{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fbfbfd;font-size:15px}
+  .field input:focus,.field select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+  .check{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink);margin-top:10px;line-height:1.4}
+  .check input{margin-top:2px;accent-color:var(--accent)}
+  .check small{color:var(--muted)}
+  textarea{width:100%;min-height:180px;resize:vertical;border:1px solid var(--line);border-radius:12px;padding:12px;background:#fbfbfd;font-size:14px;line-height:1.55}
+  .roster-tools{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap}
+  .roster-tools input{width:64px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fbfbfd}
+  .mini-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;font-size:12.5px;color:var(--muted)}
+  .mini-btn:hover{color:var(--ink)}
+  .count{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#f6f7fa;border-radius:12px;font-size:14px}
+  .count b{font-size:16px}
+  .count .warn{color:var(--danger);font-weight:600}
+
+  /* ---------- Stage ---------- */
+  .main{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .stage{background:var(--surface);border-radius:22px;box-shadow:var(--shadow);padding:26px clamp(14px,3vw,36px) 32px;display:flex;flex-direction:column;gap:26px}
+  .front{display:flex;flex-direction:column;align-items:center;gap:12px;transition:opacity .4s}
+  .board{width:min(72%,620px);height:58px;border-radius:8px;background:linear-gradient(180deg,#2e5146,#203a31);border:7px solid #8b6b4b;color:#e8f2ec;display:grid;place-items:center;font-weight:700;letter-spacing:.6em;padding-left:.6em;font-size:15px;box-shadow:inset 0 0 22px rgba(0,0,0,.28),0 3px 8px rgba(0,0,0,.08)}
+  .desk{width:132px;height:36px;border-radius:7px;background:linear-gradient(180deg,#d8ab7c,#b98a5c);color:#4b3320;font-size:13px;font-weight:700;display:grid;place-items:center;letter-spacing:.3em;padding-left:.3em;box-shadow:0 3px 6px rgba(80,50,20,.18)}
+  body.teacher-view .stage{flex-direction:column-reverse}
+  body.teacher-view .front{flex-direction:column-reverse}
+  .stage:not(.done) .front{opacity:.55}
+
+  .seat-area{display:grid;gap:12px}
+  .seat-area.groups{gap:22px 26px}
+  .group{background:#f7f8fb;border-radius:16px;padding:10px 10px 12px;display:flex;flex-direction:column;gap:8px}
+  body.teacher-view .seat-area:not(.mini) .group{flex-direction:column-reverse}
+  .group-title{font-size:12px;font-weight:700;color:var(--muted);text-align:center}
+  .group-seats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+  .seat{position:relative;min-height:64px;background:#fff;border:1.5px solid var(--seat-line);border-radius:12px;display:grid;place-items:center;overflow:hidden;padding:14px 6px 8px;transition:border-color .25s,background .25s}
+  .seat-no{position:absolute;top:5px;left:8px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .seat-name{font-size:clamp(15px,1.55vw,22px);font-weight:700;letter-spacing:-.01em;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+  .seat-name.len-m{font-size:clamp(13px,1.25vw,18px)}
+  .seat-name.len-l{font-size:clamp(11px,1vw,15px)}
+  .seat.filled{border-color:#cdd2f6;background:linear-gradient(180deg,#fff,#fafbff)}
+  .seat.vacant{background:repeating-linear-gradient(135deg,#fafbfc 0 8px,#f3f4f7 8px 16px);border-style:dashed}
+  .stage.is-rolling .seat{border-color:#d8dcfb;background:#fbfbff}
+  .seat.spin .seat-name{animation:slot .11s ease-out}
+  .seat.landed{animation:land .5s cubic-bezier(.2,1.5,.4,1)}
+  .seat.landed.filled{border-color:var(--accent-2)}
+  @keyframes slot{from{transform:translateY(-70%);opacity:.15;filter:blur(2px)}to{transform:none;opacity:1;filter:none}}
+  @keyframes land{0%{transform:scale(.92)}55%{transform:scale(1.06)}100%{transform:scale(1)}}
+
+  .actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;align-items:center}
+  .primary{border:0;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#fff;font-weight:700;border-radius:14px;padding:15px 38px;font-size:17px;box-shadow:0 8px 22px rgba(75,86,210,.32);transition:transform .15s,box-shadow .15s}
+  .primary:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(75,86,210,.38)}
+  .primary:disabled{opacity:.6;cursor:default;transform:none}
+  .ghost{border:1px solid var(--line);background:var(--surface);border-radius:14px;padding:14px 18px;font-size:14px;font-weight:600;color:var(--muted)}
+  .ghost:hover{color:var(--ink)}
+  .status{text-align:center;color:var(--muted);font-size:13px;min-height:18px;margin:0}
+
+  /* ---------- Modal (teacher) ---------- */
+  .backdrop{position:fixed;inset:0;background:rgba(15,18,30,.5);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+  .backdrop[hidden]{display:none}
+  .modal{background:#fff;border-radius:20px;width:min(760px,100%);max-height:92vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .modal header{display:flex;justify-content:space-between;align-items:center;padding:20px 22px 0}
+  .modal h3{margin:0;font-size:18px}
+  .modal .body{padding:14px 22px 6px;display:flex;flex-direction:column;gap:18px}
+  .modal .hint{margin:0;font-size:12.5px;color:var(--muted);background:#f6f7fa;border-radius:10px;padding:10px 12px;line-height:1.5}
+  .modal section{border:1px solid var(--line);border-radius:14px;padding:14px}
+  .modal h4{margin:0 0 10px;font-size:14px}
+  .modal h4 small{color:var(--muted);font-weight:400;margin-left:6px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .row select{flex:1;min-width:120px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:#fbfbfd}
+  .add-btn{border:0;background:var(--ink);color:#fff;border-radius:10px;padding:9px 16px;font-weight:600}
+  .list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+  .list li{display:flex;align-items:center;gap:6px;background:#f2f3f7;border-radius:999px;padding:6px 6px 6px 12px;font-size:13px}
+  .list li.bad{background:#fdeeee;color:var(--danger)}
+  .list li button{border:0;background:#fff;border-radius:50%;width:22px;height:22px;line-height:20px;font-size:13px;color:var(--muted);padding:0}
+  .list .empty-note{background:none;color:var(--faint);padding:4px 0}
+  .mini-wrap{margin-top:12px;background:#fafbfc;border-radius:12px;padding:10px}
+  .mini-board{height:8px;width:50%;margin:0 auto 10px;border-radius:4px;background:#2e5146}
+  .seat-area.mini{gap:5px}
+  .seat-area.mini.groups{gap:10px}
+  .seat-area.mini .group{padding:6px;gap:4px;border-radius:10px;background:#f0f1f5}
+  .seat-area.mini .group-seats{gap:4px}
+  .seat-area.mini .group-title{font-size:10px}
+  .seat-area.mini .seat{min-height:30px;padding:2px;border-radius:7px;cursor:pointer;border-width:1px}
+  .seat-area.mini .seat-no{display:none}
+  .seat-area.mini .seat-name{font-size:11px;font-weight:600;color:var(--faint)}
+  .seat-area.mini .seat.fixed{background:#fff4dc;border-color:#f0b84b}
+  .seat-area.mini .seat.fixed .seat-name{color:#8a5a00}
+  .seat-area.mini .seat.sel{outline:2px solid var(--accent);outline-offset:1px}
+  .secret-status{margin-top:10px;font-size:13px;line-height:1.6}
+  .secret-status .ok{color:var(--ok);font-weight:600}
+  .secret-status .err{color:var(--danger);font-weight:600}
+  .secret-status .muted{color:var(--muted)}
+  .modal footer{display:flex;justify-content:space-between;gap:8px;padding:12px 22px 20px;flex-wrap:wrap}
+  .danger-btn{border:1px solid #f1caca;background:#fff;color:var(--danger);border-radius:10px;padding:9px 14px;font-size:13px}
+  .close-x{border:0;background:#f2f3f7;border-radius:50%;width:32px;height:32px;font-size:15px;color:var(--muted)}
+
+  /* ---------- Toast ---------- */
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#1b2130;color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90vw;text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+
+  @media print{
+    body{background:#fff}
+    .topbar .tools,#panel,.actions,.toast,.backdrop{display:none!important}
+    .layout{display:block;padding:0}
+    .stage{box-shadow:none;padding:10px}
+    .stage .front{opacity:1!important}
+    .seat{break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <h1 id="title">우리 반 자리 배치</h1>
+    <span class="today" id="today"></span>
+  </div>
+  <div class="tools">
+    <button class="icon-btn" id="soundBtn" type="button">🔊 소리</button>
+    <button class="icon-btn" id="panelBtn" type="button">옵션 숨기기</button>
+    <button class="icon-btn" id="fullBtn" type="button">전체 화면</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="panel" id="panel">
+    <div>
+      <h2>배치 방식</h2>
+      <div class="seg" id="modeSeg">
+        <button type="button" data-mode="grid">줄 맞춤 (행·열)</button>
+        <button type="button" data-mode="group">모둠</button>
+      </div>
+    </div>
+
+    <div id="gridOpts">
+      <div class="fields">
+        <div class="field"><label for="rows">행 (앞→뒤)</label><input id="rows" type="number" min="1" max="12"></div>
+        <div class="field"><label for="cols">열 (좌→우)</label><input id="cols" type="number" min="1" max="12"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="paired"> <span>짝꿍 책상 (2열씩 묶어서 보기)</span></label>
+    </div>
+
+    <div id="groupOpts" hidden>
+      <div class="fields three">
+        <div class="field"><label for="groupSize">모둠 인원</label>
+          <select id="groupSize"><option value="3">3명</option><option value="4">4명</option><option value="5">5명</option><option value="6">6명</option></select></div>
+        <div class="field"><label for="groupCount">모둠 수</label><input id="groupCount" type="number" min="1" max="16"></div>
+        <div class="field"><label for="groupsPerRow">한 줄에</label><input id="groupsPerRow" type="number" min="1" max="6"></div>
+      </div>
+    </div>
+
+    <label class="check" style="margin-top:-6px"><input type="checkbox" id="compact">
+      <span>빈자리 자동 정리<br><small id="compactHint"></small></span></label>
+
+    <div>
+      <h2>학생 명단</h2>
+      <textarea id="roster" spellcheck="false" placeholder="이름 또는 번호를 줄바꿈이나 쉼표로 구분해 입력하세요.&#10;예) 김민준, 이서연, 박도윤"></textarea>
+      <div class="roster-tools">
+        <input id="numCount" type="number" min="1" max="99" value="28" aria-label="학생 수">
+        <button class="mini-btn" id="fillNums" type="button">번호로 채우기</button>
+        <button class="mini-btn" id="clearRoster" type="button">지우기</button>
+      </div>
+    </div>
+
+    <div class="count" id="countBox"></div>
+  </aside>
+
+  <main class="main">
+    <section class="stage" id="stage">
+      <div class="front">
+        <div class="board">칠판</div>
+        <div class="desk">교탁</div>
+      </div>
+      <div class="seat-area" id="seatArea"></div>
+    </section>
+    <div class="actions">
+      <button class="primary" id="startBtn" type="button">자리 배치 시작</button>
+      <button class="ghost" id="viewBtn" type="button">교사 시점으로 보기</button>
+      <button class="ghost" id="printBtn" type="button">인쇄</button>
+    </div>
+    <p class="status" id="status"></p>
+  </main>
+</div>
+
+<!-- 교사 전용: 제목 3번 클릭 또는 Ctrl(⌘)+Shift+Z -->
+<div class="backdrop" id="secret" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="secretTitle">
+    <header>
+      <h3 id="secretTitle">교사 전용 설정</h3>
+      <button class="close-x" type="button" data-close aria-label="닫기">✕</button>
+    </header>
+    <div class="body">
+      <p class="hint">이 창은 <b>제목을 빠르게 3번 클릭</b>하거나 <b>Ctrl(⌘) + Shift + Z</b>로만 열립니다. 설정은 이 브라우저에만 저장되며, 메인 화면에는 아무 표시도 남지 않습니다. 급할 땐 <b>Esc</b>로 바로 닫으세요.</p>
+
+      <section>
+        <h4>지정석 <small>특정 학생을 특정 자리에 고정</small></h4>
+        <div class="row">
+          <select id="fxName" aria-label="학생"></select>
+          <select id="fxSeat" aria-label="자리"></select>
+          <button class="add-btn" id="fxAdd" type="button">고정</button>
+        </div>
+        <div class="mini-wrap">
+          <div class="mini-board" title="칠판"></div>
+          <div class="seat-area mini" id="miniMap"></div>
+        </div>
+        <ul class="list" id="fxList"></ul>
+      </section>
+
+      <section>
+        <h4>분리 <small>서로 붙어 앉거나(상하좌우) 같은 모둠이 되면 안 되는 학생</small></h4>
+        <div class="row">
+          <select id="spA" aria-label="학생 A"></select>
+          <span style="color:var(--muted)">↔</span>
+          <select id="spB" aria-label="학생 B"></select>
+          <button class="add-btn" id="spAdd" type="button">분리</button>
+        </div>
+        <label class="check"><input type="checkbox" id="spDiag"> <span>대각선으로 붙은 자리도 떨어뜨리기 <small>(행·열 모드)</small></span></label>
+        <ul class="list" id="spList"></ul>
+      </section>
+
+      <section>
+        <h4>조건 점검</h4>
+        <button class="mini-btn" id="checkBtn" type="button">지금 설정으로 배치 가능한지 확인</button>
+        <div class="secret-status" id="secretStatus"></div>
+      </section>
+    </div>
+    <footer>
+      <button class="danger-btn" id="secretReset" type="button">교사 설정 전체 삭제</button>
+      <button class="add-btn" type="button" data-close>닫기</button>
+    </footer>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================================
+   배치 엔진 (DOM 없음 · 순수 함수)
+   ========================================================================= */
+/*ALGO-START*/
+function rngInt(n){
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const a = new Uint32Array(1), lim = Math.floor(0x100000000 / n) * n;
+    let x; do { crypto.getRandomValues(a); x = a[0]; } while (x >= lim);
+    return x % n;
+  }
+  return Math.floor(Math.random() * n);
+}
+function shuffle(arr){
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = rngInt(i + 1); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+/** 레이아웃 설정 → 좌석 목록. order 값이 작을수록 '먼저 채울 자리' */
+function buildSeats(c){
+  const seats = [];
+  if (c.mode === 'grid') {
+    for (let r = 0; r < c.rows; r++) for (let col = 0; col < c.cols; col++) {
+      seats.push({ key:`g:${r}:${col}`, r, c:col, group:null, order:r,
+                   no: r * c.cols + col + 1, label:`${r+1}행 ${col+1}열` });
+    }
+  } else {
+    const S = c.groupSize, P = Math.max(1, c.groupsPerRow), inRows = Math.ceil(S / 2);
+    for (let g = 0; g < c.groupCount; g++) for (let k = 0; k < S; k++) {
+      const lr = Math.floor(k / 2), lc = k % 2, gr = Math.floor(g / P), gc = g % P;
+      seats.push({ key:`m:${g}:${k}`, group:g, k, lr, lc, gr, gc,
+                   r: gr * inRows + lr, c: gc * 2 + lc, order:k, no:k + 1,
+                   span: (S % 2 === 1 && k === S - 1), label:`${g+1}모둠 ${k+1}번` });
+    }
+  }
+  return seats;
+}
+
+/** 두 자리가 '붙어 있는지' (분리 조건 위반 여부) */
+function isNear(a, b, mode, diagonal){
+  if (a.key === b.key) return false;
+  if (mode === 'group') return a.group === b.group;
+  const dr = Math.abs(a.r - b.r), dc = Math.abs(a.c - b.c);
+  return diagonal ? (dr <= 1 && dc <= 1) : (dr + dc === 1);
+}
+
+/**
+ * 제약 충족(CSP) 배치.
+ * 1) 지정석 고정 → 2) 분리 조건이 있는 학생만 백트래킹(MRV + 무작위 후보 순서)
+ * → 3) 나머지 학생은 남은 자리에 완전 무작위 셔플. 시간 제한 시 무작위 재시작.
+ * 결과: { ok, assign:Map(seatKey→name), warnings, secret(오류가 비밀 설정 때문인지) }
+ */
+function solveSeating(opt){
+  const { seats, students, fixed = [], pairs = [], mode, diagonal = false, compact = true,
+          maxRestarts = 40, stepLimit = 4000, timeBudgetMs = 1500 } = opt;
+  const warnings = [];
+  if (!students.length) return { ok:false, secret:false, error:'학생 명단이 비어 있어요.' };
+  if (students.length > seats.length)
+    return { ok:false, secret:false, error:`학생 수(${students.length}명)가 좌석 수(${seats.length}석)보다 많아요.` };
+
+  const seatByKey = new Map(seats.map(s => [s.key, s]));
+  const nameSet = new Set(students);
+  const fixedSeatOf = new Map(), seatTaken = new Map();
+
+  for (const f of fixed) {
+    if (!nameSet.has(f.name)) { warnings.push(`지정석 '${f.name}': 명단에 없어 무시됨`); continue; }
+    if (!seatByKey.has(f.seat)) { warnings.push(`지정석 '${f.name}': 현재 배치에 없는 자리라 무시됨`); continue; }
+    if (fixedSeatOf.has(f.name)) return { ok:false, secret:true, error:`'${f.name}'에게 지정석이 두 개 이상이에요.` };
+    if (seatTaken.has(f.seat))
+      return { ok:false, secret:true, error:`${seatByKey.get(f.seat).label}에 두 학생(${seatTaken.get(f.seat)}, ${f.name})이 지정됐어요.` };
+    fixedSeatOf.set(f.name, f.seat); seatTaken.set(f.seat, f.name);
+  }
+
+  const sep = new Map();
+  for (const [a, b] of pairs) {
+    if (a === b) continue;
+    if (!nameSet.has(a) || !nameSet.has(b)) { warnings.push(`분리 '${a}'↔'${b}': 명단에 없는 학생이 있어 무시됨`); continue; }
+    if (!sep.has(a)) sep.set(a, new Set());
+    if (!sep.has(b)) sep.set(b, new Set());
+    sep.get(a).add(b); sep.get(b).add(a);
+  }
+
+  for (const [a, set] of sep) {
+    if (!fixedSeatOf.has(a)) continue;
+    for (const b of set) {
+      if (a < b && fixedSeatOf.has(b) &&
+          isNear(seatByKey.get(fixedSeatOf.get(a)), seatByKey.get(fixedSeatOf.get(b)), mode, diagonal))
+        return { ok:false, secret:true, error:`지정석끼리 분리 조건이 충돌해요: ${a} ↔ ${b}` };
+    }
+  }
+
+  const freeSeats = seats.filter(s => !seatTaken.has(s.key));
+  const needFree = students.length - fixedSeatOf.size;
+  const constrained = students.filter(n => !fixedSeatOf.has(n) && sep.has(n));
+  const others = students.filter(n => !fixedSeatOf.has(n) && !sep.has(n));
+
+  // 후보 자리 풀: '빈자리 정리'면 앞자리(모둠은 고르게)부터 정확히 필요한 만큼. 안 되면 전체 자리로 재시도.
+  const pools = [];
+  if (compact && freeSeats.length > needFree) {
+    pools.push(shuffle(freeSeats).sort((a, b) => a.order - b.order).slice(0, needFree));
+  }
+  pools.push(freeSeats);
+
+  const TIMEOUT = {};
+  const t0 = Date.now();
+
+  function attempt(pool){
+    const placed = new Map(fixedSeatOf);       // name → seatKey
+    const used = new Set();                     // pool 안에서 사용된 seatKey
+    const remaining = new Set(shuffle(constrained));
+    let steps = 0;
+
+    function candidates(n){
+      const out = [];
+      for (const s of pool) {
+        if (used.has(s.key)) continue;
+        let ok = true;
+        for (const m of sep.get(n)) {
+          const k = placed.get(m);
+          if (k !== undefined && isNear(s, seatByKey.get(k), mode, diagonal)) { ok = false; break; }
+        }
+        if (ok) out.push(s);
+      }
+      return out;
+    }
+    function rec(){
+      if (remaining.size === 0) return true;
+      if (++steps > stepLimit || Date.now() - t0 > timeBudgetMs) throw TIMEOUT;
+      let best = null, bestC = null;                       // MRV: 남은 선택지가 가장 적은 학생부터
+      for (const n of remaining) {
+        const c = candidates(n);
+        if (best === null || c.length < bestC.length) { best = n; bestC = c; if (!c.length) break; }
+      }
+      if (!bestC.length) return false;
+      remaining.delete(best);
+      for (const s of shuffle(bestC)) {
+        placed.set(best, s.key); used.add(s.key);
+        if (rec()) return true;
+        placed.delete(best); used.delete(s.key);
+      }
+      remaining.add(best);
+      return false;
+    }
+    try { return rec() ? placed : null; }
+    catch (e) { if (e === TIMEOUT) return 'timeout'; throw e; }
+  }
+
+  for (const pool of pools) {
+    for (let i = 0; i < maxRestarts; i++) {
+      const placed = attempt(pool);
+      if (placed === 'timeout') { if (Date.now() - t0 > timeBudgetMs) break; continue; }
+      if (placed === null) break;                           // 이 풀로는 불가능함이 증명됨
+      const assign = new Map();
+      for (const [n, k] of placed) assign.set(k, n);
+      const left = shuffle(pool.filter(s => !assign.has(s.key)));
+      shuffle(others).forEach((n, idx) => assign.set(left[idx].key, n));
+      const v = verifySeating({ assign, seats, students, fixedSeatOf, sep, mode, diagonal });
+      if (v) return { ok:false, secret:true, error:'내부 검증 실패: ' + v };
+      return { ok:true, assign, warnings };
+    }
+  }
+  return { ok:false, secret:true, warnings,
+           error:'모든 조건을 만족하는 배치를 찾지 못했어요. 분리 조건이 너무 많거나 지정석과 충돌합니다.' };
+}
+
+function verifySeating({ assign, seats, students, fixedSeatOf, sep, mode, diagonal }){
+  const seatByKey = new Map(seats.map(s => [s.key, s]));
+  const where = new Map();
+  for (const [k, n] of assign) { if (where.has(n)) return `${n} 중복 배치`; where.set(n, k); }
+  for (const n of students) if (!where.has(n)) return `${n} 미배치`;
+  for (const [n, k] of fixedSeatOf) if (where.get(n) !== k) return `${n} 지정석 불일치`;
+  for (const [a, set] of sep) for (const b of set)
+    if (isNear(seatByKey.get(where.get(a)), seatByKey.get(where.get(b)), mode, diagonal)) return `${a}↔${b} 인접`;
+  return null;
+}
+/*ALGO-END*/
+
+/* =========================================================================
+   앱 (UI)
+   ========================================================================= */
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const K_CFG = 'seat-arranger:cfg', K_UI = 'seat-arranger:ui';
+  const SAMPLE = ['김민준','이서연','박도윤','최하은','정시우','강지유','조하준','윤서윤','장은우','임지민',
+    '한예준','오수아','서주원','신채원','권지호','황하린','안유준','송다은','류건우','전소율',
+    '홍현우','고윤아','문선우','양지아','손도현','배서현','백이준','허나윤'].join('\n');
+
+  const store = {
+    get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v){ try { localStorage.setItem(k, v); } catch {} },
+    del(k){ try { localStorage.removeItem(k); } catch {} },
+  };
+  const enc = s => btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+  const dec = b => new TextDecoder().decode(Uint8Array.from(atob(b), ch => ch.charCodeAt(0)));
+
+  const cfg = Object.assign({ mode:'grid', rows:6, cols:5, paired:true, groupSize:4, groupCount:7,
+    groupsPerRow:4, compact:true, roster:SAMPLE, sound:true, view:'student', panelHidden:false },
+    (() => { try { return JSON.parse(store.get(K_CFG)) || {}; } catch { return {}; } })());
+  const secret = Object.assign({ fixed:[], pairs:[], diagonal:false },
+    (() => { try { return JSON.parse(dec(store.get(K_UI) || '')) || {}; } catch { return {}; } })());
+
+  const saveCfg = () => store.set(K_CFG, JSON.stringify(cfg));
+  const saveSecret = () => store.set(K_UI, enc(JSON.stringify(secret)));
+
+  let seats = [], seatEls = new Map(), lastResult = null, lastSig = '', rolling = false, lastSecretError = '';
+  let selectedMiniSeat = null;
+
+  const parseRoster = text => {
+    const seen = new Map(), out = [];
+    for (const raw of text.split(/[\n,，、;\t]+/)) {
+      const n = raw.trim(); if (!n) continue;
+      const c = (seen.get(n) || 0) + 1; seen.set(n, c);
+      out.push(c === 1 ? n : `${n}(${c})`);
+    }
+    return out;
+  };
+  const layoutSig = () => JSON.stringify(cfg.mode === 'grid'
+    ? ['g', cfg.rows, cfg.cols] : ['m', cfg.groupSize, cfg.groupCount, cfg.groupsPerRow]);
+  const clampInt = (v, lo, hi, d) => { v = parseInt(v, 10); return isNaN(v) ? d : Math.min(hi, Math.max(lo, v)); };
+
+  /* ---------- 사운드 (WebAudio, 외부 파일 없음) ---------- */
+  let actx = null, lastTick = 0;
+  function beep(freq, dur, vol, type = 'square'){
+    if (!cfg.sound) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime;
+      o.type = type; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+    } catch {}
+  }
+  const tick = () => { const n = performance.now(); if (n - lastTick > 55) { lastTick = n; beep(1700 + Math.random()*500, 0.025, 0.018); } };
+
+  /* ---------- 렌더링 ---------- */
+  function makeSeat(s){
+    const el = document.createElement('div');
+    el.className = 'seat'; el.dataset.key = s.key;
+    el.innerHTML = `<span class="seat-no">${s.no}</span><span class="seat-name"></span>`;
+    return el;
+  }
+  function setName(el, name){
+    const n = el.lastChild; n.textContent = name || '';
+    n.classList.toggle('len-m', !!name && name.length >= 5 && name.length < 8);
+    n.classList.toggle('len-l', !!name && name.length >= 8);
+  }
+
+  function renderLayout(container, list, { teacher = false, mini = false } = {}){
+    container.innerHTML = '';
+    const map = new Map();
+    if (cfg.mode === 'grid') {
+      container.className = 'seat-area grid' + (mini ? ' mini' : '');
+      const tracks = [], colTrack = {};
+      if (cfg.paired && !mini) {
+        const pairs = [];
+        for (let c = 0; c < cfg.cols; c += 2) pairs.push(c + 1 < cfg.cols ? [c, c + 1] : [c]);
+        const vp = teacher ? pairs.slice().reverse().map(p => p.slice().reverse()) : pairs;
+        vp.forEach((p, i) => { if (i) tracks.push('var(--aisle)'); p.forEach(c => { tracks.push('minmax(0,1fr)'); colTrack[c] = tracks.length; }); });
+      } else {
+        for (let c = 0; c < cfg.cols; c++) { tracks.push('minmax(0,1fr)'); colTrack[c] = teacher ? cfg.cols - c : c + 1; }
+      }
+      container.style.gridTemplateColumns = tracks.join(' ');
+      for (const s of list) {
+        const el = makeSeat(s);
+        el.style.gridRow = teacher ? cfg.rows - s.r : s.r + 1;
+        el.style.gridColumn = colTrack[s.c];
+        container.appendChild(el); map.set(s.key, el);
+      }
+    } else {
+      container.className = 'seat-area groups' + (mini ? ' mini' : '');
+      const P = Math.max(1, Math.min(cfg.groupsPerRow, cfg.groupCount));
+      const GR = Math.ceil(cfg.groupCount / P), inRows = Math.ceil(cfg.groupSize / 2);
+      container.style.gridTemplateColumns = `repeat(${P}, minmax(0,1fr))`;
+      const blocks = [];
+      for (let g = 0; g < cfg.groupCount; g++) {
+        const gr = Math.floor(g / P), gc = g % P;
+        const b = document.createElement('div'); b.className = 'group';
+        b.style.gridRow = teacher ? GR - gr : gr + 1;
+        b.style.gridColumn = teacher ? P - gc : gc + 1;
+        b.innerHTML = `<div class="group-title">${g + 1}모둠</div><div class="group-seats"></div>`;
+        container.appendChild(b); blocks.push(b.lastChild);
+      }
+      for (const s of list) {
+        const el = makeSeat(s);
+        el.style.gridRow = teacher ? inRows - s.lr : s.lr + 1;
+        el.style.gridColumn = s.span ? '1 / span 2' : (teacher ? 2 - s.lc : s.lc + 1);
+        blocks[s.group].appendChild(el); map.set(s.key, el);
+      }
+    }
+    return map;
+  }
+
+  function renderSeats(){
+    seats = buildSeats(cfg);
+    const sig = layoutSig();
+    if (sig !== lastSig) { lastResult = null; $('#stage').classList.remove('done'); $('#status').textContent = ''; }
+    lastSig = sig;
+    seatEls = renderLayout($('#seatArea'), seats, { teacher: cfg.view === 'teacher' });
+    if (lastResult) for (const [k, el] of seatEls) {
+      const n = lastResult.get(k); setName(el, n); el.classList.add(n ? 'filled' : 'vacant');
+    }
+    updateCount();
+    if (!$('#secret').hidden) renderSecret();
+  }
+
+  function updateCount(){
+    const n = parseRoster(cfg.roster).length, m = seats.length;
+    $('#countBox').innerHTML = `<span>학생 <b>${n}</b>명</span><span>좌석 <b>${m}</b>석</span>` +
+      (n > m ? `<span class="warn">${n - m}석 부족</span>` : `<span style="color:var(--muted)">빈자리 ${m - n}</span>`);
+  }
+
+  function syncControls(){
+    document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.mode === cfg.mode));
+    $('#gridOpts').hidden = cfg.mode !== 'grid';
+    $('#groupOpts').hidden = cfg.mode !== 'group';
+    $('#rows').value = cfg.rows; $('#cols').value = cfg.cols; $('#paired').checked = cfg.paired;
+    $('#groupSize').value = cfg.groupSize; $('#groupCount').value = cfg.groupCount; $('#groupsPerRow').value = cfg.groupsPerRow;
+    $('#compact').checked = cfg.compact;
+    $('#compactHint').textContent = cfg.mode === 'grid' ? '남는 자리는 뒷줄에 모읍니다' : '모둠별 인원을 고르게 맞춥니다';
+    if ($('#roster').value !== cfg.roster) $('#roster').value = cfg.roster;
+    $('#soundBtn').textContent = cfg.sound ? '🔊 소리' : '🔇 소리';
+    document.body.classList.toggle('teacher-view', cfg.view === 'teacher');
+    $('#viewBtn').textContent = cfg.view === 'teacher' ? '학생 시점으로 보기' : '교사 시점으로 보기';
+    document.body.classList.toggle('panel-hidden', cfg.panelHidden);
+    $('#panelBtn').textContent = cfg.panelHidden ? '옵션 보기' : '옵션 숨기기';
+  }
+
+  let toastTimer;
+  function toast(msg){
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  /* ---------- 배치 실행 + 룰렛 연출 ---------- */
+  function solveNow(){
+    return solveSeating({ seats, students: parseRoster(cfg.roster), fixed: secret.fixed, pairs: secret.pairs,
+      mode: cfg.mode, diagonal: secret.diagonal && cfg.mode === 'grid', compact: cfg.compact });
+  }
+
+  function start(){
+    if (rolling) return;
+    const students = parseRoster(cfg.roster);
+    const res = solveNow();                       // 결과는 '먼저' 확정해 두고, 화면에서는 무작위처럼 연출
+    if (!res.ok) {
+      if (res.secret) { lastSecretError = res.error; toast('자리를 배치하지 못했어요. 잠시 후 다시 시도해 주세요.'); }
+      else toast(res.error);
+      return;
+    }
+    lastSecretError = '';
+    rolling = true;
+    const btn = $('#startBtn'); btn.disabled = true; btn.textContent = '배치하는 중…';
+    const stage = $('#stage'); stage.classList.remove('done'); stage.classList.add('is-rolling');
+    $('#status').textContent = '';
+
+    const keys = [...seatEls.keys()], order = shuffle(keys), total = order.length;
+    const st = new Map();
+    order.forEach((k, i) => {
+      const el = seatEls.get(k);
+      el.classList.remove('filled', 'vacant', 'landed');
+      st.set(k, { settleAt: 1500 + (total > 1 ? i / (total - 1) : 1) * 1150 + Math.random() * 120,
+                  next: 0, done: false, last: '' });
+    });
+    const t0 = performance.now();
+    function frame(now){
+      const t = now - t0; let pending = 0, spun = false;
+      for (const k of keys) {
+        const s = st.get(k); if (s.done) continue;
+        const el = seatEls.get(k);
+        if (t >= s.settleAt) {
+          s.done = true;
+          const name = res.assign.get(k);
+          setName(el, name);
+          el.classList.remove('spin'); el.classList.add(name ? 'filled' : 'vacant', 'landed');
+          beep(name ? 660 : 440, 0.07, 0.03, 'triangle');
+          continue;
+        }
+        pending++;
+        if (t >= s.next) {
+          let n; do { n = students[rngInt(students.length)]; } while (students.length > 1 && n === s.last);
+          s.last = n; setName(el, n);
+          el.classList.remove('spin'); void el.offsetWidth; el.classList.add('spin');
+          s.next = t + 45 + Math.pow(t / s.settleAt, 3) * 230;     // 점점 느려지는 슬롯 효과
+          spun = true;
+        }
+      }
+      if (spun) tick();
+      if (pending) requestAnimationFrame(frame); else finish(res);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function finish(res){
+    lastResult = res.assign; rolling = false;
+    const btn = $('#startBtn'); btn.disabled = false; btn.textContent = '다시 배치하기';
+    const stage = $('#stage'); stage.classList.remove('is-rolling'); stage.classList.add('done');
+    const d = new Date();
+    $('#status').textContent = `${d.getMonth()+1}월 ${d.getDate()}일 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 배치 완료`;
+    [523, 659, 784].forEach((f, i) => setTimeout(() => beep(f, 0.18, 0.04, 'sine'), i * 90));
+  }
+
+  /* ---------- 교사 전용 모달 ---------- */
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  function fillSelect(sel, items, keep){
+    const prev = keep ? sel.value : '';
+    sel.innerHTML = items.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('');
+    if (prev && items.some(([v]) => v === prev)) sel.value = prev;
+  }
+
+  function renderSecret(){
+    const names = parseRoster(cfg.roster), nameSet = new Set(names);
+    const seatByKey = new Map(seats.map(s => [s.key, s]));
+    const opts = names.map(n => [n, n]);
+    fillSelect($('#fxName'), opts, true);
+    fillSelect($('#spA'), opts, true);
+    fillSelect($('#spB'), opts, true);
+    if ($('#spA').value === $('#spB').value && names.length > 1 && !$('#spB').dataset.touched) $('#spB').selectedIndex = 1;
+    fillSelect($('#fxSeat'), seats.map(s => [s.key, s.label]), true);
+    if (selectedMiniSeat && seatByKey.has(selectedMiniSeat)) $('#fxSeat').value = selectedMiniSeat;
+
+    // 미니맵 (항상 칠판이 위)
+    const fixedBySeat = new Map(secret.fixed.map(f => [f.seat, f.name]));
+    const map = renderLayout($('#miniMap'), seats, { mini: true });
+    for (const [k, el] of map) {
+      const n = fixedBySeat.get(k);
+      setName(el, n || seatByKey.get(k).no);
+      el.classList.toggle('fixed', !!n);
+      el.classList.toggle('sel', k === $('#fxSeat').value);
+      el.title = seatByKey.get(k).label + (n ? ` · ${n}` : '');
+      el.onclick = () => { selectedMiniSeat = k; $('#fxSeat').value = k; renderSecret(); };
+    }
+
+    $('#fxList').innerHTML = secret.fixed.length ? secret.fixed.map((f, i) => {
+      const s = seatByKey.get(f.seat), bad = !s || !nameSet.has(f.name);
+      const why = !nameSet.has(f.name) ? ' (명단에 없음)' : !s ? ' (현재 배치에 없는 자리)' : '';
+      return `<li class="${bad ? 'bad' : ''}">${esc(f.name)} → ${esc(s ? s.label : '?')}${why}<button data-fx="${i}" aria-label="삭제">✕</button></li>`;
+    }).join('') : '<li class="empty-note">아직 지정석이 없어요.</li>';
+
+    $('#spList').innerHTML = secret.pairs.length ? secret.pairs.map(([a, b], i) => {
+      const bad = !nameSet.has(a) || !nameSet.has(b);
+      return `<li class="${bad ? 'bad' : ''}">${esc(a)} ↔ ${esc(b)}${bad ? ' (명단에 없음)' : ''}<button data-sp="${i}" aria-label="삭제">✕</button></li>`;
+    }).join('') : '<li class="empty-note">아직 분리 설정이 없어요.</li>';
+
+    $('#spDiag').checked = secret.diagonal;
+    $('#secretStatus').innerHTML = lastSecretError ? `<span class="err">최근 배치 실패:</span> ${esc(lastSecretError)}` : '';
+  }
+
+  function openSecret(){
+    if (!$('#secret').hidden) return;
+    $('#secret').hidden = false; $('#spB').dataset.touched = '';
+    renderSecret();
+  }
+  function closeSecret(){ $('#secret').hidden = true; }
+
+  function runCheck(){
+    const res = solveNow();
+    const w = (res.warnings || []).map(x => `<div class="muted">· ${esc(x)}</div>`).join('');
+    $('#secretStatus').innerHTML = res.ok
+      ? `<span class="ok">✓ 모든 조건을 만족하는 배치가 가능해요.</span> <span class="muted">(지정석 ${secret.fixed.length} · 분리 ${secret.pairs.length})</span>${w}`
+      : `<span class="err">✕ ${esc(res.error)}</span>${w}`;
+  }
+
+  /* ---------- 이벤트 ---------- */
+  document.querySelectorAll('#modeSeg button').forEach(b => b.addEventListener('click', () => {
+    cfg.mode = b.dataset.mode; saveCfg(); syncControls(); renderSeats();
+  }));
+  const numHandler = (id, lo, hi) => $('#' + id).addEventListener('change', e => {
+    cfg[id] = clampInt(e.target.value, lo, hi, cfg[id]); e.target.value = cfg[id]; saveCfg(); renderSeats();
+  });
+  numHandler('rows', 1, 12); numHandler('cols', 1, 12); numHandler('groupCount', 1, 16); numHandler('groupsPerRow', 1, 6);
+  $('#groupSize').addEventListener('change', e => { cfg.groupSize = +e.target.value; saveCfg(); renderSeats(); });
+  $('#paired').addEventListener('change', e => { cfg.paired = e.target.checked; saveCfg(); renderSeats(); });
+  $('#compact').addEventListener('change', e => { cfg.compact = e.target.checked; saveCfg(); });
+  $('#roster').addEventListener('input', e => { cfg.roster = e.target.value; saveCfg(); updateCount(); if (!$('#secret').hidden) renderSecret(); });
+  $('#fillNums').addEventListener('click', () => {
+    const n = clampInt($('#numCount').value, 1, 99, 28);
+    cfg.roster = Array.from({ length: n }, (_, i) => `${i + 1}번`).join('\n'); saveCfg(); syncControls(); updateCount();
+  });
+  $('#clearRoster').addEventListener('click', () => { cfg.roster = ''; saveCfg(); syncControls(); updateCount(); });
+
+  $('#startBtn').addEventListener('click', start);
+  $('#viewBtn').addEventListener('click', () => { cfg.view = cfg.view === 'teacher' ? 'student' : 'teacher'; saveCfg(); syncControls(); renderSeats(); });
+  $('#printBtn').addEventListener('click', () => window.print());
+  $('#soundBtn').addEventListener('click', () => { cfg.sound = !cfg.sound; saveCfg(); syncControls(); });
+  $('#panelBtn').addEventListener('click', () => { cfg.panelHidden = !cfg.panelHidden; saveCfg(); syncControls(); });
+  $('#fullBtn').addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => {});
+  });
+
+  // 비밀 진입 1: 제목 3연속 클릭
+  let clicks = 0, clickTimer;
+  $('#title').addEventListener('click', () => {
+    clicks++; clearTimeout(clickTimer);
+    if (clicks >= 3) { clicks = 0; openSecret(); return; }
+    clickTimer = setTimeout(() => { clicks = 0; }, 600);
+  });
+  // 비밀 진입 2: Ctrl(⌘) + Shift + Z  /  Esc 닫기
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyZ') { e.preventDefault(); openSecret(); }
+    else if (e.key === 'Escape' && !$('#secret').hidden) closeSecret();
+  });
+
+  $('#secret').addEventListener('click', e => { if (e.target.id === 'secret' || e.target.closest('[data-close]')) closeSecret(); });
+  $('#fxSeat').addEventListener('change', e => { selectedMiniSeat = e.target.value; renderSecret(); });
+  $('#spB').addEventListener('change', e => { e.target.dataset.touched = '1'; });
+  $('#fxAdd').addEventListener('click', () => {
+    const name = $('#fxName').value, seat = $('#fxSeat').value;
+    if (!name || !seat) return;
+    secret.fixed = secret.fixed.filter(f => f.name !== name && f.seat !== seat);
+    secret.fixed.push({ name, seat }); saveSecret(); lastSecretError = ''; renderSecret();
+  });
+  $('#spAdd').addEventListener('click', () => {
+    const a = $('#spA').value, b = $('#spB').value;
+    if (!a || !b) return;
+    if (a === b) { $('#secretStatus').innerHTML = '<span class="err">서로 다른 두 학생을 골라 주세요.</span>'; return; }
+    if (secret.pairs.some(([x, y]) => (x === a && y === b) || (x === b && y === a))) return;
+    secret.pairs.push([a, b]); saveSecret(); lastSecretError = ''; renderSecret();
+  });
+  $('#fxList').addEventListener('click', e => { const i = e.target.dataset.fx; if (i != null) { secret.fixed.splice(+i, 1); saveSecret(); renderSecret(); } });
+  $('#spList').addEventListener('click', e => { const i = e.target.dataset.sp; if (i != null) { secret.pairs.splice(+i, 1); saveSecret(); renderSecret(); } });
+  $('#spDiag').addEventListener('change', e => { secret.diagonal = e.target.checked; saveSecret(); });
+  $('#checkBtn').addEventListener('click', runCheck);
+  $('#secretReset').addEventListener('click', () => {
+    if (!confirm('지정석과 분리 설정을 모두 삭제할까요?')) return;
+    secret.fixed = []; secret.pairs = []; secret.diagonal = false; lastSecretError = '';
+    store.del(K_UI); renderSecret();
+  });
+
+  /* ---------- 시작 ---------- */
+  const d = new Date();
+  $('#today').textContent = `${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}. (${'일월화수목금토'[d.getDay()]})`;
+  syncControls();
+  renderSeats();
+})();
+</script>
+</body>
+</html>
